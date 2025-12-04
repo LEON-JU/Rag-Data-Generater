@@ -1,7 +1,8 @@
 # Rag-Data-Generater
 
 面向 Retrieval-Augmented Generation (RAG) 的数据生成工具箱。仓库提供两套可运行示例：  
-1) 完整 system prompt + 中断式工具调用管线；2) 基于 LangChain 的多 Agent 协作式对话。  
+1) 完整 system prompt + 中断式工具调用管线；
+2) 基于 LangChain 的多 Agent 协作式对话。  
 所有运行入口都对应一个 YAML 配置文件，可以集中管理 LLM/Elasticsearch/API Key 等参数。
 
 ## 目录结构
@@ -41,58 +42,30 @@ Rag-Data-Generater
 
 脚本：`examples/full_prompt_pipeline/run_pipeline.py`
 
-1. 按需修改 `configs/full_prompt_pipeline.yaml`：
-   - `env` 中填入 Elasticsearch、LLM 服务 地址 + 密码；  
-   - `llm.client` 选择 `openai` 或 `siliconflow`，补充各自的 `model/base_url/api_key`；  
-   - `dataset` 的 subset/split/index 控制默认数据抽样。
-2. 安装依赖：`pip install -e .`
-3. 调用示例（命令行参数会覆盖配置）：
-
-```bash
-python examples/full_prompt_pipeline/run_pipeline.py \
-    --config configs/full_prompt_pipeline.yaml \
-    --subset hotpotqa_rand1000 \
-    --split test \
-    --index 0 \
-    --client openai \
-    --max-rounds 4
-```
+按需修改 `configs/full_prompt_pipeline.yaml`
 
 脚本流程：读取配置 → 设置系统 prompt → 运行 `InterruptionOrchestrator` → 打印每一轮思考、工具调用结果和最终回答，并输出 token 统计。
-
-常用可选参数：
-- `--sample-size`: 指定读取 parquet 时的采样大小；
-- `--client`: 临时切换为 `siliconflow/openai`；
-- `--config`: 指向自定义 YAML。
 
 ## 运行模式 2：LangChain 多 Agent 协作
 
 脚本：`examples/multi_agent_langchain/demo.py`
 
-1. 编辑 `configs/multi_agent_langchain.yaml`：
-   - `env` 保持与 Elasticsearch/Wiki_RAG 相关的变量一致；
-   - `llm` 区块内填写 LangChain `ChatOpenAI` 需要的 `model/base_url/api_key/temperature`；
-   - `dataset.questions` 列表写入待生成的多跳问题；
-   - `output.path` 指定 JSONL 结果输出路径。
-2. 运行命令：
+按需编辑 `configs/multi_agent_langchain.yaml`：
 
-```bash
-python examples/multi_agent_langchain/demo.py \
-    --config configs/multi_agent_langchain.yaml \
-    --output multi_agent_sft_dataset.jsonl \
-    --max-rounds 5 \
-    --verbose
+
+脚本会组装 5 个 Agent（Reasoning/Search/Summary/Backtrack/Answer），循环调用 Wiki_RAG 工具并将完整标签序列展平为 SFT 所需的 `messages`，写入 JSONL。
+
+# 安装说明
+按照ArtSearch的指导进行安装
+
+需要下载wikipedia数据
+
+注意下载elasticsearch后需要设置密码：
 ```
+cd ArtSearch/data/elasticsearch-8.17.3/bin
 
-脚本会组装 5 个 Agent（Reasoning/Search/Summary/Verification/Answer），循环调用 Wiki_RAG 工具并将完整标签序列展平为 SFT 所需的 `messages`，写入 JSONL。
+# 启动服务(建议用tmux挂起服务)
+./elasticsearch
 
-常用可选参数：
-- `--max-rounds`: 限制 search→backtrack 循环次数；
-- `--verbose`: 打印每轮中间结果，便于排查；
-- `--output`: 指定新的 JSONL 路径。
-
-## 其它提示
-
-- `docs/data_formats.md` 描述了现成的数据格式，可作为构建自己数据集的参考。
-- 将新的工具接入管线时，可在 `rag_data_generator/tooling` 内实现 `Tool` 并注册至 `ToolRegistry`，两套示例都会自动拾取。
-- 若需批量生成数据，可在上述脚本的基础上编写额外的 CLI，只需指向对应配置文件即可复用所有环境参数。*** End Patch
+# 设置密码，稍后将密码填入configs中的yaml或export ELASTIC_PASSWORD=密码
+./elasticsearch-reset-password -u elastic
