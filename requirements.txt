@@ -1,0 +1,11 @@
+elasticsearch
+pandas
+datasets
+tqdm
+python-dotenv
+requests
+openai
+pyyaml
+sentence-transformers
+langchain
+langchain-openai
