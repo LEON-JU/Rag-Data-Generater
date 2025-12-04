@@ -69,3 +69,6 @@ cd ArtSearch/data/elasticsearch-8.17.3/bin
 
 # 设置密码，稍后将密码填入configs中的yaml或export ELASTIC_PASSWORD=密码
 ./elasticsearch-reset-password -u elastic
+```
+
+data文件夹可从https://github.com/jiangxinke/Agentic-RAG-R1/tree/dev-lite/data获取
