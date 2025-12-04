@@ -1,0 +1,23 @@
+# LLM 与常用环境变量
+env:
+  ELASTIC_URL: "URL"
+  ELASTIC_USERNAME: "elastic"
+  ELASTIC_PASSWORD: "PASSWARD"
+  WIKI_RAG_EMBED_MODEL: "sentence-transformers/paraphrase-MiniLM-L6-v2"
+
+llm:
+  model: "MODELNAME"
+  base_url: "URL"
+  api_key: "APIKEY"
+  temperature: 0.3
+
+pipeline:
+  max_rounds: 5
+  verbose: True
+
+dataset:
+  questions:
+    - "United States Air Force 432nd Wing location"
+
+output:
+  path: "multi_agent_sft_dataset.json"

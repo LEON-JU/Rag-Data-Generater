@@ -1,0 +1,33 @@
+# LLM 与环境变量配置
+env:
+  GENERATOR_LLM_MODEL: "MODELNAME"
+  GENERATOR_LLM_BASE_URL: "URL"
+  GENERATOR_LLM_API_KEY: "填入本地或远程推理服务的 API Key"
+  ELASTIC_URL: "http://localhost:9200"
+  ELASTIC_USERNAME: "elastic"
+  ELASTIC_PASSWORD: "A_NFGp+1zOJ2GIh+U2vP"
+  WIKI_RAG_EMBED_MODEL: "sentence-transformers/paraphrase-MiniLM-L6-v2"
+
+# LLM 客户端定义，脚本会根据 client 字段创建对应实例
+llm:
+  client: "openai"   # 可选 openai / siliconflow
+  openai:
+    model: "MODELNAME"
+    base_url: "URL"
+    api_key: "填入本地或远程推理服务的 API Key"
+  siliconflow:
+    model: "MODELNAME"
+    base_url: "URL"
+    api_key: "填入本地或远程推理服务的 API Key"
+    timeout: 60
+
+# 数据抽样参数
+dataset:
+  subset: "hotpotqa_rand1000"
+  split: "test"
+  sample_size: null
+  index: 0
+
+# 中断式推理管线参数
+pipeline:
+  max_rounds: 4
