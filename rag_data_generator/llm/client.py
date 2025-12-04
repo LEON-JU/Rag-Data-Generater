@@ -21,7 +21,7 @@ class ChatClient(Protocol):  # pragma: no cover - structural typing helper
 class OpenAILLMClient:
     def __init__(
         self,
-        model: str | None = "/home/juyiang/data/llm_models/qwen3-32b",
+        model: str | None = "/home/juyiang/data/llm_models/qwen25-32b-awq",
         api_key: str | None = "none",
         base_url: str | None = 'http://localhost:8000/v1',
     ) -> None:

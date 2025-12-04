@@ -1,1 +1,5 @@
 data/
+__pycache__/
+.pytest_cache/
+.hf_cache/
+multi_agent_sft_dataset.jsonl

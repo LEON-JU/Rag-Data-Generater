@@ -80,7 +80,9 @@ class WikiRAGTool:
         size = int(size) if size is not None else self.default_size
         size = max(1, min(size, self.default_size))
         hits = self._ensure_searcher().search(query, size=size)
-        refined = self._select_sentences(query, hits)
+        if hits:
+            hits = [hits[0]]  # only keep the top ranked document
+        refined = hits
         return json.dumps(refined, ensure_ascii=False)
 
     def _ensure_embedder(self) -> SentenceTransformer:
