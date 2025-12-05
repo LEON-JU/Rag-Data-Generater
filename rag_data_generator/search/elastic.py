@@ -25,9 +25,8 @@ except ImportError:  # pragma: no cover
     Elasticsearch = None  # type: ignore
     helpers = None  # type: ignore
 
-DEFAULT_ELASTIC_URL = os.environ.get("ELASTIC_URL", "http://localhost:9200")
-DEFAULT_ELASTIC_USERNAME = os.environ.get("ELASTIC_USERNAME", "elastic")
-DEFAULT_ELASTIC_PASSWORD = os.environ.get("ELASTIC_PASSWORD") or os.environ.get("ELASTIC_SEARCH_PASSWORD")
+DEFAULT_ELASTIC_URL = "http://localhost:9200"
+DEFAULT_ELASTIC_USERNAME = "elastic"
 
 
 class MissingElasticsearchPassword(RuntimeError):
@@ -49,9 +48,10 @@ def create_es_client(
         verify_certs: Whether to verify TLS certificates.
     """
 
-    url = url or DEFAULT_ELASTIC_URL
-    username = username or DEFAULT_ELASTIC_USERNAME
-    password = password or DEFAULT_ELASTIC_PASSWORD
+    # Resolve credentials lazily so runtime env overrides (e.g. from configs) take effect.
+    url = url or os.environ.get("ELASTIC_URL", DEFAULT_ELASTIC_URL)
+    username = username or os.environ.get("ELASTIC_USERNAME", DEFAULT_ELASTIC_USERNAME)
+    password = password or os.environ.get("ELASTIC_PASSWORD") or os.environ.get("ELASTIC_SEARCH_PASSWORD")
     if not password:
         raise MissingElasticsearchPassword(
             "Set ELASTIC_PASSWORD or ELASTIC_SEARCH_PASSWORD before using Elasticsearch tools."
