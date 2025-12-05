@@ -33,6 +33,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+try:  # optional dependency used for progress display
+    from tqdm.auto import tqdm
+except Exception:  # pragma: no cover - tqdm is optional
+    tqdm = None  # type: ignore
+
 # ---- set repo root so we can import rag_data_generator* ----
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -52,6 +57,18 @@ from rag_data_generator.utils.config import (
 )
 
 DEFAULT_CONFIG_PATH = ROOT / "configs/multi_agent_langchain.yaml"
+
+DEFAULT_HOTPOTQA_FILES = (
+    Path("/home/juyiang/data/hotpotqa/fullwiki/train-00000-of-00002.parquet"),
+    Path("/home/juyiang/data/hotpotqa/fullwiki/train-00001-of-00002.parquet"),
+)
+DEFAULT_TWOWIKI_FILE = Path("/home/juyiang/data/2wikimultihopqa/train.parquet")
+
+DATASET_CHOICES = (
+    "asarcher",
+    "hotpotqa_fullwiki",
+    "twowikimultihopqa",
+)
 
 
 # ===================== 工具函数 =====================
@@ -201,7 +218,7 @@ You receive the question, the initial reasoning, the search query, and the summa
 Your job is to decide whether the information in the summary is sufficient to answer the question.
 
 Your responsibilities:
-• Re-evaluate the plan made in the initial reasoning. If the search and summary already cover necessary information, produce <backtrack></backtrack> to indicate no correction needed.
+• Re-evaluate the plan made in the initial reasoning. If the search and summary already cover necessary information, output a single <backtrack>...</backtrack> block explaining why the information is adequate, followed by an <end> tag to indicate that no further search is needed. Produce exactly one <backtrack> block and one <end> tag.\n
 • Check whether the recent search and summary cover the required entities. If not, produce a <backtrack> block that:
     – states what should be searched next, using explicit entity names (not the full question)
 • Check whether the recent search and summary is related to the required entities. If not, then produce a <backtrack> block that:
@@ -209,7 +226,9 @@ Your responsibilities:
     – revises the plan if necessary (e.g., choose a more specific entity or break it down further, correct wrong search query)
 
 Format rules:
-• Output exactly one <backtrack>...</backtrack> block, put your backtrack thoughts in this block.
+• Based on the above conditions, output either a single <backtrack> block, or a <backtrack> block followed by an <end> tag.
+eg1: <backtrack>The summary provides ... , thus it is sufficient to answer the question.</backtrack><end>
+eg2: <backtrack>The summary provides ... , it is not sufficient to answer the question. Therefore, the next step should focus on finding out ...</backtrack><end>
 • You are not allowed to include <search>...</search> in your output.
 
 Question:
@@ -332,7 +351,6 @@ class SingleRoundPipeline:
 
 def build_reasoning_user_prompt(question: str) -> str:
     return (
-        "You are Agent 1 (Reasoning Agent) in a multi-agent RAG system.\n\n"
         "For the following question, decompose the key concepts and entities that need "
         "to be looked up in external tools. Do NOT answer the question itself.\n\n"
         f"Question:\n{question}\n\n"
@@ -342,7 +360,6 @@ def build_reasoning_user_prompt(question: str) -> str:
 
 def build_search_user_prompt(question: str, reasoning: str) -> str:
     return (
-        "You are Agent 2 (Search Agent) in a multi-agent RAG system.\n\n"
         "Given the user's question and the previous <reasoning>...</reasoning> block, "
         "produce a search query consisting of at most 5 keywords.\n\n"
         "The search query:\n"
@@ -360,7 +377,6 @@ def build_summary_user_prompt(
 ) -> str:
     obs_block = f"<observation>{observation}</observation>"
     return (
-        "You are Agent 3 (Summary Agent) in a multi-agent RAG system.\n\n"
         "You are given the internal reasoning, the search query, and the observation "
         "returned by a search tool. Your task is to summarize ONLY the key factual "
         "information from the observation that is relevant to answering the question.\n\n"
@@ -377,18 +393,27 @@ def build_backtrack_user_prompt(
     question: str, reasoning: str, search: str, summary: str
 ) -> str:
     return (
-        "You are Agent 4 (Verification & Backtracking Agent) in a multi-agent RAG system.\n\n"
         "Given the question, the initial <reasoning>...</reasoning>, the <search>...</search> "
-        "query and the <summary>...</summary> of the observation, decide whether the available "
-        "information is sufficient to answer the question.\n\n"
-        "If it is sufficient, return an EMPTY <backtrack></backtrack> block.\n"
-        "If it is NOT sufficient, return a <backtrack>...</backtrack> block that explains what "
-        "additional entities or topics should be searched next.\n\n"
+        "query, and the <summary>...</summary> of the observations, determine whether the "
+        "available information is sufficient to answer the question.\n\n"
+        
+        "If it IS sufficient, output a single <backtrack>...</backtrack> block explaining why "
+        "the information is adequate, followed by an <end> tag to indicate that no further "
+        "search is needed. Produce exactly one <backtrack> block and one <end> tag.\n"
+        
+        "If it is NOT sufficient, output a single <backtrack>...</backtrack> block explaining "
+        "what additional entities or topics should be searched next. Produce exactly one "
+        "<backtrack> block and do NOT output an <end> tag.\n\n"
+        
         f"Question:\n{question}\n\n"
         f"{reasoning.strip()}\n\n"
         f"{search.strip()}\n\n"
         f"{summary.strip()}\n\n"
-        "Output exactly one <backtrack>...</backtrack> block and nothing else."
+        
+        "Based on the above conditions, output either a single <backtrack> block, or a "
+        "<backtrack> block followed by an <end> tag."
+        "eg1: <backtrack>The summary provides ... , thus it is sufficient to answer the question.</backtrack><end>"
+        "eg2: <backtrack>The summary provides ... , it is not sufficient to answer the question. Therefore, the next step should focus on finding out ...</backtrack><end>"
     )
 
 
@@ -564,6 +589,66 @@ def load_asarcher_questions(
     return questions
 
 
+def resolve_dataset_files(
+    dataset_name: str, provided_paths: List[str] | None
+) -> List[Path]:
+    if dataset_name == "asarcher":
+        return []
+
+    if provided_paths:
+        paths = [Path(p).expanduser().resolve() for p in provided_paths]
+    else:
+        if dataset_name == "hotpotqa_fullwiki":
+            paths = [Path(p) for p in DEFAULT_HOTPOTQA_FILES]
+        else:
+            paths = [Path(DEFAULT_TWOWIKI_FILE)]
+
+    missing = [str(p) for p in paths if not p.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "Missing parquet files for dataset "
+            f"{dataset_name}: {', '.join(missing)}. "
+            "Please supply --dataset-files pointing to the correct location."
+        )
+
+    if dataset_name == "twowikimultihopqa" and len(paths) != 1:
+        raise ValueError(
+            "2WikiMultiHopQA expects exactly one parquet file. "
+            "Provide a single path via --dataset-files."
+        )
+
+    return paths
+
+
+def load_hotpotqa_questions(
+    parquet_files: List[Path], sample_size: int | None
+) -> List[Tuple[int, str]]:
+    questions: List[Tuple[int, str]] = []
+    next_id = 0
+    for file_path in parquet_files:
+        logging.info(f"Loading HotpotQA data from {file_path}")
+        dataset = Dataset.from_parquet(str(file_path))
+        for row in dataset:
+            questions.append((next_id, str(row["question"])))
+            next_id += 1
+            if sample_size is not None and len(questions) >= sample_size:
+                return questions
+    return questions
+
+
+def load_twowiki_questions(
+    parquet_file: Path, sample_size: int | None
+) -> List[Tuple[int, str]]:
+    logging.info(f"Loading 2WikiMultiHopQA data from {parquet_file}")
+    dataset = Dataset.from_parquet(str(parquet_file))
+    questions: List[Tuple[int, str]] = []
+    for idx, row in enumerate(dataset):
+        questions.append((idx, str(row["question"])))
+        if sample_size is not None and len(questions) >= sample_size:
+            break
+    return questions
+
+
 # ===================== MAIN =====================
 
 
@@ -577,6 +662,21 @@ def parse_args() -> argparse.Namespace:
         help="Path to YAML config (default: configs/multi_agent_langchain.yaml)",
     )
     parser.add_argument(
+        "--dataset",
+        default="asarcher",
+        choices=DATASET_CHOICES,
+        help="Dataset to read questions from.",
+    )
+    parser.add_argument(
+        "--dataset-files",
+        nargs="+",
+        default=None,
+        help=(
+            "Parquet file(s) for datasets backed by local files. "
+            "Used when --dataset is hotpotqa_fullwiki or twowikimultihopqa."
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         default="sft_data/multi_agent",
         help="Base directory to save SFT jsonl files.",
@@ -585,13 +685,13 @@ def parse_args() -> argparse.Namespace:
         "--split",
         default="train",
         choices=["train", "test"],
-        help="Which split of ASearcher to use (default: train).",
+        help="Which split of ASearcher to use (default: train). Ignored by other datasets.",
     )
     parser.add_argument(
         "--subset",
         default=None,
         help="Subset name for test split, e.g. 'hotpotqa_rand1000'. "
-        "Ignored for train split.",
+        "Applicable only when --dataset asarcher and split=test.",
     )
     parser.add_argument(
         "--sample-size",
@@ -616,6 +716,19 @@ def parse_args() -> argparse.Namespace:
         default=50,
         help="Log every N finished examples.",
     )
+    parser.add_argument(
+        "--progress-bar",
+        dest="progress_bar",
+        action="store_true",
+        help="Display a tqdm progress bar while generating.",
+    )
+    parser.add_argument(
+        "--no-progress-bar",
+        dest="progress_bar",
+        action="store_false",
+        help="Disable tqdm progress output.",
+    )
+    parser.set_defaults(progress_bar=True)
     return parser.parse_args()
 
 
@@ -637,10 +750,27 @@ def main() -> None:
         raise ValueError("LLM config is empty in YAML file!")
 
     # ---- prepare dataset ----
-    questions = load_asarcher_questions(
-        split=args.split, subset=args.subset, sample_size=args.sample_size
+    if args.dataset == "asarcher":
+        questions = load_asarcher_questions(
+            split=args.split, subset=args.subset, sample_size=args.sample_size
+        )
+        dataset_label = f"ASearcher ({args.split})"
+    elif args.dataset == "hotpotqa_fullwiki":
+        file_paths = resolve_dataset_files(args.dataset, args.dataset_files)
+        questions = load_hotpotqa_questions(file_paths, sample_size=args.sample_size)
+        dataset_label = (
+            f"HotpotQA fullwiki ({len(file_paths)} parquet files)"
+        )
+    else:
+        file_paths = resolve_dataset_files(args.dataset, args.dataset_files)
+        questions = load_twowiki_questions(
+            parquet_file=file_paths[0], sample_size=args.sample_size
+        )
+        dataset_label = "2WikiMultiHopQA"
+
+    logging.info(
+        f"Loaded {len(questions)} questions from {dataset_label} ({args.dataset})."
     )
-    logging.info(f"Loaded {len(questions)} questions from ASearcher ({args.split}).")
 
     # ---- prepare output paths & already processed ids ----
     output_base = Path(args.output_dir).resolve()
@@ -688,6 +818,13 @@ def main() -> None:
     total = len(todo)
     finished = 0
 
+    progress_bar = None
+    if args.progress_bar:
+        if tqdm is None:
+            logging.warning("tqdm is not installed, disabling progress bar output.")
+        else:
+            progress_bar = tqdm(total=total, desc="Examples", unit="ex")
+
     try:
         with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
             future_to_id = {
@@ -707,11 +844,15 @@ def main() -> None:
                 _ = future_to_id[future]
                 # if there was an exception it has already been logged in process_example
                 finished += 1
+                if progress_bar is not None:
+                    progress_bar.update(1)
                 if finished % max(1, args.log_interval) == 0:
                     logging.info(f"Progress: {finished}/{total} examples done.")
     except KeyboardInterrupt:
         logging.warning("Interrupted by user, stopping early. Partial results are saved.")
     finally:
+        if progress_bar is not None:
+            progress_bar.close()
         for fh in out_files.values():
             fh.close()
         logging.info("All file handles closed.")
