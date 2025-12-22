@@ -11,14 +11,17 @@
 Rag-Data-Generater
 ├── configs/
 │   ├── full_prompt_pipeline.yaml      # 完整 prompt 管线配置（LLM、ES、数据抽样等）
-│   └── multi_agent_langchain.yaml     # LangChain 多 Agent 配置（LLM、问题列表、输出路径）
+│   ├── multi_agent_langchain.yaml     # LangChain 多 Agent 配置（LLM、问题列表、输出路径）
+│   └── single_agent_streaming.yaml    # 单 Agent 流式示例配置（微调模型 API、温度、数据索引）
 ├── docs/
 │   └── data_formats.md                # 当前支持的数据格式说明
 ├── examples/
 │   ├── full_prompt_pipeline/
 │   │   └── run_pipeline.py            # 中断式工具调用演示入口
-│   └── multi_agent_langchain/
-│       └── demo.py                    # LangChain 多 Agent SFT 数据生成入口
+│   ├── multi_agent_langchain/
+│   │   └── demo.py                    # LangChain 多 Agent SFT 数据生成入口
+│   └── single_agent_streaming/
+│       └── run_single_agent.py        # 单 Agent 流式推理 & 工具调用演示
 ├── rag_data_generator/
 │   ├── datasets/prepare.py            # HotpotQA/ASearcher 等数据加载与抽样
 │   ├── llm/client.py                  # OpenAI/SiliconFlow 客户端封装
@@ -36,7 +39,7 @@ Rag-Data-Generater
 - `env`: 会在脚本启动时写入 `os.environ`，覆盖历史写法（如 `ELASTIC_PASSWORD`、`GENERATOR_LLM_API_KEY` 等），可统一管理 API Key。
 - `llm`: 指定模型名称、推理服务 URL、温度等；`full_prompt_pipeline.yaml` 支持 `client=openai|siliconflow` 两种客户端。
 - `dataset`: 为示例脚本提供默认数据来源（如 ASearcher 子集、样本索引、SFT 问题列表），也可在命令行覆盖。
-- `pipeline`/`output`: 控制最大推理轮数、最终 JSONL 输出路径。
+- `pipeline`/`output`: 控制最大推理轮数、最终 JSONL 输出路径。`single_agent_streaming.yaml` 额外提供 `temperature`，用于单 Agent 流式演示的采样温度。
 
 ## 运行模式 1：完整 prompt + 工具中断管线
 
@@ -54,6 +57,29 @@ Rag-Data-Generater
 
 
 脚本会组装 5 个 Agent（Reasoning/Search/Summary/Backtrack/Answer），循环调用 Wiki_RAG 工具并将完整标签序列展平为 SFT 所需的 `messages`，写入 JSONL。
+
+## 运行模式 3：单 Agent 流式推理 + 工具调用
+
+脚本：`examples/single_agent_streaming/run_single_agent.py`
+
+配置：`configs/single_agent_streaming.yaml`（新增 `GENERATOR_LLM_MODEL` 等字段，用来指向你的微调后模型或 vLLM API）
+
+运行示例：
+```bash
+python examples/single_agent_streaming/run_single_agent.py \
+    --config configs/single_agent_streaming.yaml \
+    --subset hotpotqa_rand1000 \
+    --index 12
+```
+
+脚本特点：
+- 采用单个系统 prompt，规范输出顺序：`<reasoning>` → `<question>` → `<summary>` → `<backtrack>` → `<end>` → `<answer>`；
+- 每当模型在流式输出中生成 `<question>...</question>`，脚本立即拦截、执行工具（默认 Wiki_RAG），并自动把 `<observation>...</observation>` 写回上下文；
+- 按索引读取 ASearcher 数据集问题，打印完整的流式对话、工具调用和最终回答，并附上原始答案以便人工比对。
+
+关于流式输出：
+- 如果后端是本地 vLLM OpenAI Server，无需添加额外启动参数（`--enable-logging` 等可按需设置）；脚本会自动在调用时设置 `stream=True`；
+- 若某些客户端（如当前的 SiliconFlow 封装）暂不支持流式接口，脚本自动回退到非流式模式，但依旧遵循 `<question>` 标签格式。
 
 # 安装说明
 按照ArtSearch的指导进行安装
