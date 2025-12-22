@@ -5,8 +5,8 @@ export MASTER_PORT=12345
 export NCCL_P2P_DISABLE=1
 export NCCL_IB_DISABLE=1
 
-BASE_MODEL="/home/juyiang/data/llm_models/DeepSeek-R1-Distill-Qwen-14B-AddTags2"
-MODEL_SINGLE_ABILITY_PATH="/home/juyiang/data/llm_models/DeepSeek-R1-Distill-Qwen-14B-SingleAbility"
+BASE_MODEL="/home/juyiang/data/llm_models/Qwen2.5-7B-Instruct-AddTags2"
+MODEL_SINGLE_ABILITY_PATH="/home/juyiang/data/llm_models/Qwen2.5-7B-Instruct-SingleAbility"
 DATA_DIR="/home/juyiang/data/dataset/sft_data/multi_agent"
 
 swift sft \

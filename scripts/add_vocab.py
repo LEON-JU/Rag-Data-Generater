@@ -81,6 +81,8 @@ def main():
             "</reasoning>",
             "<search>",
             "</search>",
+            "<observation>",
+            "</observation>",
             "<summary>",
             "</summary>",
             "<backtrack>",

@@ -49,6 +49,37 @@ class OpenAILLMClient:
         self.last_usage = usage
         return response.choices[0].message.content or ""
 
+    def stream_chat(self, messages: List[dict], **kwargs):
+        """Yield incremental chunks from the chat completion."""
+        temperature = kwargs.get("temperature", 0.7)
+        stream = self._client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=temperature,
+            stream=True,
+        )
+        try:
+            for chunk in stream:
+                choices = getattr(chunk, "choices", None) or []
+                for choice in choices:
+                    delta = getattr(choice, "delta", None)
+                    if delta is None:
+                        continue
+                    content = getattr(delta, "content", None)
+                    if not content:
+                        continue
+                    if isinstance(content, str):
+                        yield content
+                    else:  # pragma: no cover - structured delta payloads
+                        for item in content:
+                            text = item.get("text")
+                            if text:
+                                yield text
+        finally:  # pragma: no cover - defensive cleanup for generator close
+            close_stream = getattr(stream, "close", None)
+            if callable(close_stream):
+                close_stream()
+
 
 class SiliconFlowLLMClient:
     """Minimal client for SiliconFlow's OpenAI-compatible chat endpoint."""
@@ -92,6 +123,9 @@ class SiliconFlowLLMClient:
         if not choices:
             raise RuntimeError(f"No completion returned from SiliconFlow: {data}")
         return choices[0].get("message", {}).get("content", "")
+
+    def stream_chat(self, messages: List[dict], **kwargs):
+        raise NotImplementedError("SiliconFlow streaming is not implemented. Use complete() instead.")
 
 
 __all__ = ["ChatClient", "OpenAILLMClient", "SiliconFlowLLMClient"]

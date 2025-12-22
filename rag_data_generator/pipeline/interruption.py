@@ -18,7 +18,9 @@ class ToolCall:
 
 
 class SearchTagDetector:
-    pattern = re.compile(r"<search>(.*?)</search>", re.DOTALL)
+    def __init__(self, tag: str = "search") -> None:
+        self.tag = tag
+        self.pattern = re.compile(rf"<{tag}>(.*?)</{tag}>", re.DOTALL)
 
     def extract(self, text: str) -> List[str]:
         return [match.group(1).strip() for match in self.pattern.finditer(text)]

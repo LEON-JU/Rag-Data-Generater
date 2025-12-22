@@ -1,15 +1,21 @@
 # LLM 与常用环境变量
 env:
-  ELASTIC_URL: "URL"
+  ELASTIC_URL: "http://localhost:9200"
   ELASTIC_USERNAME: "elastic"
-  ELASTIC_PASSWORD: "PASSWARD"
+  ELASTIC_PASSWORD: "A_NFGp+1zOJ2GIh+U2vP"
   WIKI_RAG_EMBED_MODEL: "sentence-transformers/paraphrase-MiniLM-L6-v2"
 
 llm:
-  model: "MODELNAME"
-  base_url: "URL"
-  api_key: "APIKEY"
+  model: "/home/juyiang/data/llm_models/qwen2.5-32b"
+  base_url: "http://localhost:8000/v1"
+  api_key: "dummy"
   temperature: 0.3
+  
+# 可以替换硅基流动api:
+# model: "Qwen/Qwen2.5-32B-Instruct"
+# api_key: "sk-wiyuwxkavrpcwyfbmsxlclvlfiouqwkgksmtrrwkekvjljtc"
+# base_url: "https://api.siliconflow.cn/v1"
+# temperature: 0.3
 
 pipeline:
   max_rounds: 5

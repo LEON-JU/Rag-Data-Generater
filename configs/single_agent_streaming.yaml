@@ -1,33 +1,30 @@
-# LLM 与环境变量配置
 env:
-  GENERATOR_LLM_MODEL: "/home/juyiang/data/llm_models/qwen2.5-32b"
+  GENERATOR_LLM_MODEL: "/path/to/your/fine-tuned-model"
   GENERATOR_LLM_BASE_URL: "http://localhost:8000/v1"
-  GENERATOR_LLM_API_KEY: "填入本地或远程推理服务的 API Key"
+  GENERATOR_LLM_API_KEY: "dummy"
   ELASTIC_URL: "http://localhost:9200"
   ELASTIC_USERNAME: "elastic"
   ELASTIC_PASSWORD: "A_NFGp+1zOJ2GIh+U2vP"
   WIKI_RAG_EMBED_MODEL: "sentence-transformers/paraphrase-MiniLM-L6-v2"
 
-# LLM 客户端定义，脚本会根据 client 字段创建对应实例
 llm:
-  client: "openai"   # 可选 openai / siliconflow
+  client: "openai"
   openai:
-    model: "/home/juyiang/data/llm_models/qwen2.5-32b"
+    model: "/home/juyiang/data/llm_models/deepseek-r1-0528-qwen3-8b-AddTags2"
     base_url: "http://localhost:8000/v1"
     api_key: "dummy"
   siliconflow:
     model: "Qwen/Qwen2.5-32B-Instruct"
-    api_key: "sk-wiyuwxkavrpcwyfbmsxlclvlfiouqwkgksmtrrwkekvjljtc"
+    api_key: "sk-your-key"
     base_url: "https://api.siliconflow.cn/v1"
     timeout: 60
 
-# 数据抽样参数
 dataset:
   subset: "hotpotqa_rand1000"
   split: "test"
   sample_size: null
   index: 0
 
-# 中断式推理管线参数
 pipeline:
-  max_rounds: 4
+  max_rounds: 6
+  temperature: 0.2

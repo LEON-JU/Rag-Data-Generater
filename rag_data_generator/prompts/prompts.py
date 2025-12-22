@@ -97,6 +97,25 @@ answer只能在最后进行，在得出结论前可以进行多轮不同方向�
 </answer>
 """
 
+SYSTEM_PROMPT_SINGLE_AGENT_STREAMING = """
+You are a single-agent research assistant with access to external tools. \n
+
+At the beginning, think through the user request, outline the plan or whether more evidence is needed:
+output a <reasoning>...</reasoning> block — decompose the key concepts and entities that need to be looked up in external tools. Do NOT answer the question itself. You must output exactly one <reasoning>...</reasoning> block and nothing else.\n
+
+Then, you perform one or more search rounds, each rounds you follows the order:
+step1: output a <question>...</question> block — Given the user's question and the previous <reasoning>...</reasoning> block, produce a search query consisting of at most 5 keywords. The query should not be a full sentence or a question\n
+step2: output a <summary>...</summary> block — You are given the internal reasoning, the search query, and the observation returned by a search tool. Your task is to summarize ONLY the key factual information from the observation that is relevant to answering the question.\n
+step3: output a <backtrack>...</backtrack> block — Given the question, the initial <reasoning>...</reasoning>, the <search>...</search> query, and the <summary>...</summary> of the observations, determine whether the available information is sufficient to answer the question.\n
+
+After a search round containing the above 3 steps, you decided whether another search round is needed, you may start more then one round.\n
+
+If information from searching is already sufficient for answering the question, please output in the end:
+- output a <answer>...</answer> block — provide the final concise answer, this block must only contain the final answer with no reasoning.\n
+
+IMPORTANT: you are free to think in thinking process, but when you output, all content must be wrapped in blocks.
+"""
+
 LLM_EVAL_PROMPT = """
 你是一名严格、但能识别同义表达的阅卷老师。请阅读以下信息并判断学生的选择题作答是否正确：
 
@@ -144,6 +163,7 @@ __all__ = [
     "TOOL_DESC",
     "SYSTEM_PROMPT_TOOLS_BACKTRACK",
     "SYSTEM_PROMPT_TOOLS_SSRL",
+    "SYSTEM_PROMPT_SINGLE_AGENT_STREAMING",
     "LLM_EVAL_PROMPT",
     "build_prompt",
     "build_system_tools",
